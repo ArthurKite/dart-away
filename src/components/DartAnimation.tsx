@@ -5,7 +5,6 @@ interface DartAnimationProps {
   targetX: number
   targetY: number
   onLanded: () => void   // called when dart sticks (after flight)
-  onComplete: () => void // called after 2s pin time
 }
 
 /** Quadratic bezier: B(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2 */
@@ -42,9 +41,8 @@ function easeOutCubic(t: number): number {
 }
 
 const FLIGHT_DURATION = 1200 // ms
-const PIN_DURATION = 2000    // ms after landing
 
-export default function DartAnimation({ targetX, targetY, onLanded, onComplete }: DartAnimationProps) {
+export default function DartAnimation({ targetX, targetY, onLanded }: DartAnimationProps) {
   const dartRef = useRef<HTMLDivElement>(null)
   const rippleRef = useRef<HTMLDivElement>(null)
   const [phase, setPhase] = useState<'flying' | 'pinned'>('flying')
@@ -94,15 +92,12 @@ export default function DartAnimation({ targetX, targetY, onLanded, onComplete }
           rippleRef.current.style.top = `${targetY}px`
           rippleRef.current.style.opacity = '1'
         }
-
-        // After pin duration, signal completion
-        setTimeout(onComplete, PIN_DURATION)
       }
     }
 
     rafId = requestAnimationFrame(animate)
     return () => cancelAnimationFrame(rafId)
-  }, [targetX, targetY, onLanded, onComplete])
+  }, [targetX, targetY, onLanded])
 
   return (
     <>
