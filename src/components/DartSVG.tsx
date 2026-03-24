@@ -3,9 +3,10 @@
  * The tip points DOWN (toward the map) so the dart "sticks" into the target.
  */
 export default function DartSVG({ size = 45 }: { size?: number }) {
+  // viewBox is 40×80 (1:2 ratio), so rendered width = size/2, height = size
   return (
     <svg
-      width={size}
+      width={size / 2}
       height={size}
       viewBox="0 0 40 80"
       xmlns="http://www.w3.org/2000/svg"

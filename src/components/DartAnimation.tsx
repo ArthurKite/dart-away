@@ -4,7 +4,7 @@ import DartSVG from './DartSVG'
 interface DartAnimationProps {
   targetX: number
   targetY: number
-  onLanded: () => void   // called when dart sticks (after flight)
+  onLanded: () => void
 }
 
 /** Quadratic bezier: B(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2 */
@@ -35,12 +35,14 @@ function bezierTangent(
   ]
 }
 
-/** Ease-out cubic: decelerates toward the end */
+/** Ease-out cubic */
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3)
 }
 
-const FLIGHT_DURATION = 1200 // ms
+const FLIGHT_DURATION = 1200
+const DART_WIDTH = 23  // size/2 (SVG is 1:2 ratio)
+const DART_HEIGHT = 45
 
 export default function DartAnimation({ targetX, targetY, onLanded }: DartAnimationProps) {
   const dartRef = useRef<HTMLDivElement>(null)
@@ -48,16 +50,25 @@ export default function DartAnimation({ targetX, targetY, onLanded }: DartAnimat
   const [phase, setPhase] = useState<'flying' | 'pinned'>('flying')
 
   useEffect(() => {
-    // Start point: bottom-right, off-screen
     const vw = window.innerWidth
     const vh = window.innerHeight
     const p0: [number, number] = [vw + 40, vh + 40]
     const p2: [number, number] = [targetX, targetY]
 
-    // Control point: above and between start/end for a nice arc
     const midX = (p0[0] + p2[0]) / 2
     const highY = Math.min(p0[1], p2[1]) - Math.max(vh * 0.35, 200)
     const p1: [number, number] = [midX, highY]
+
+    // The dart SVG tip is at bottom-center of the element.
+    // We use a wrapper positioned so element top-left = (left, top),
+    // and apply transforms to place the tip at the bezier point.
+    //
+    // Strategy: set left/top so the tip (center-bottom) is at (x,y):
+    //   element left = x - DART_SIZE/2
+    //   element top  = y - DART_SIZE
+    // Then rotate around the tip point using transform-origin: 50% 100% (center bottom).
+
+    const halfW = DART_WIDTH / 2
 
     let startTime: number | null = null
     let rafId: number
@@ -70,23 +81,28 @@ export default function DartAnimation({ targetX, targetY, onLanded }: DartAnimat
 
       const [x, y] = bezier(t, p0, p1, p2)
       const [dx, dy] = bezierTangent(t, p0, p1, p2)
-      // Rotation: -90° offset because the dart SVG tip points down (positive Y)
       const angle = Math.atan2(dy, dx) * (180 / Math.PI) - 90
 
       if (dartRef.current) {
-        dartRef.current.style.left = `${x}px`
-        dartRef.current.style.top = `${y}px`
-        dartRef.current.style.transform = `translate(-50%, -100%) rotate(${angle}deg)`
+        // Position element so its bottom-center (tip) is at (x, y)
+        dartRef.current.style.left = `${x - halfW}px`
+        dartRef.current.style.top = `${y - DART_HEIGHT}px`
+        // Rotate around the tip (bottom-center of element)
+        dartRef.current.style.transform = `rotate(${angle}deg)`
       }
 
       if (rawT < 1) {
         rafId = requestAnimationFrame(animate)
       } else {
-        // Flight complete — dart has landed
+        // Snap to exact position with no rotation — tip exactly on target
+        if (dartRef.current) {
+          dartRef.current.style.left = `${targetX - halfW}px`
+          dartRef.current.style.top = `${targetY - DART_HEIGHT}px`
+          dartRef.current.style.transform = 'rotate(0deg)'
+        }
         setPhase('pinned')
         onLanded()
 
-        // Show ripple at landing point
         if (rippleRef.current) {
           rippleRef.current.style.left = `${targetX}px`
           rippleRef.current.style.top = `${targetY}px`
@@ -101,22 +117,24 @@ export default function DartAnimation({ targetX, targetY, onLanded }: DartAnimat
 
   return (
     <>
-      {/* Dart element */}
       <div
         ref={dartRef}
         style={{
           position: 'absolute',
           left: window.innerWidth + 40,
           top: window.innerHeight + 40,
+          width: DART_WIDTH,
+          height: DART_HEIGHT,
           zIndex: 50,
           pointerEvents: 'none',
           willChange: 'transform, left, top',
+          // Rotate around the tip = bottom-center of the element
+          transformOrigin: '50% 100%',
         }}
       >
-        <DartSVG size={45} />
+        <DartSVG size={DART_HEIGHT} />
       </div>
 
-      {/* Ripple / impact effect at landing point */}
       {phase === 'pinned' && (
         <div
           ref={rippleRef}
