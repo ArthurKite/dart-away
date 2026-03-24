@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { getCountryCode } from '../utils/countryCodes'
 import { fetchWeather, type WeatherData } from '../utils/weather'
+import { getFunFact } from '../utils/funFacts'
 
 export interface ModalData {
   weather: WeatherData | null
@@ -82,10 +83,12 @@ export default function CountryModal({ country, onClose, onThrowAgain, preloaded
     let finalWeather: WeatherData | null = null
     let finalAi: { funFact: string; slackMessage: string } | null = null
 
+    const staticFunFact = getFunFact(country)
+
     const reportData = () => {
       onDataLoaded?.({
         weather: finalWeather,
-        funFact: finalAi?.funFact ?? null,
+        funFact: staticFunFact,
         slackMessage: finalAi?.slackMessage ?? null,
       })
     }
@@ -279,18 +282,11 @@ export default function CountryModal({ country, onClose, onThrowAgain, preloaded
           ) : null}
         </p>
 
-        {/* Fun fact */}
+        {/* Fun fact — always available instantly from static lookup */}
         <div style={{ margin: '12px 0' }}>
-          {aiLoading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: '80%', height: 14, borderRadius: 4, background: '#d4a96a', opacity: 0.25, animation: 'skeleton-pulse 1.2s ease-in-out infinite' }} />
-              <div style={{ width: '60%', height: 14, borderRadius: 4, background: '#d4a96a', opacity: 0.25, animation: 'skeleton-pulse 1.2s ease-in-out infinite 0.15s' }} />
-            </div>
-          ) : (
-            <p style={{ fontSize: 17, textAlign: 'center', margin: 0, fontStyle: 'italic' }}>
-              📜 {aiContent?.funFact || 'Did you know? This country has a fascinating history waiting to be explored!'}
-            </p>
-          )}
+          <p style={{ fontSize: 17, textAlign: 'center', margin: 0, fontStyle: 'italic' }}>
+            📜 {getFunFact(country)}
+          </p>
         </div>
 
         {/* Slack message */}
