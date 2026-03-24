@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+/* ============================================================
+   THEME: Custom design tokens
+   ============================================================ */
+@theme {
+  --color-parchment:      #f4e4c1;
+  --color-parchment-dark: #e8d4a8;
+  --color-land:           #e8d5a3;
+  --color-border-map:     #d4a96a;
+  --color-ink:            #3d2b1f;
+  --color-ink-light:      #6b4c35;
+  --color-compass-gold:   #b8860b;
+  --color-ocean:          #c9dce8;
+
+  --font-display: "Playfair Display", "Georgia", serif;
+  --font-body:    "Crimson Text", "Georgia", serif;
+}
+
+/* ============================================================
+   BASE: Full-screen layout
+   ============================================================ */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background-color: var(--color-parchment);
+    color: var(--color-ink);
+  }
+}
+
+/* ============================================================
+   UTILITIES: Antique paper texture effects
+   ============================================================ */
+@layer utilities {
+  /* Grain layer via ::before pseudo-element */
+  .parchment-texture {
+    position: relative;
+  }
+
+  .parchment-texture::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0.4;
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(101, 67, 33, 0.05) 2px,
+        rgba(101, 67, 33, 0.05) 3px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 2px,
+        rgba(101, 67, 33, 0.05) 2px,
+        rgba(101, 67, 33, 0.05) 3px
+      );
+    background-size: 3px 3px;
+  }
+
+  /* Vignette darkening toward edges via ::after */
+  .vignette::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 11;
+    pointer-events: none;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 50%,
+      rgba(62, 30, 5, 0.20) 75%,
+      rgba(40, 15, 0, 0.50) 100%
+    );
+  }
+}
