@@ -42,10 +42,11 @@ export default function WorldMap({
       >
         <ZoomableGroup minZoom={1} maxZoom={5}>
         <Geographies geography={GEO_URL}>
-          {({ geographies }) => {
+          {({ geographies: rawGeos }) => {
+            const geographies = rawGeos as unknown as GeoFeature[]
             if (!reportedRef.current && onGeographiesLoaded && geographies.length > 0) {
               reportedRef.current = true
-              onGeographiesLoaded(geographies as GeoFeature[])
+              onGeographiesLoaded(geographies)
             }
 
             return geographies.map((geo) => {
@@ -56,7 +57,7 @@ export default function WorldMap({
               return (
                 <Geography
                   key={geo.rsmKey}
-                  geography={geo}
+                  geography={geo as unknown as Record<string, unknown>}
                   fill={isSelected ? GOLD_FILL : DEFAULT_FILL}
                   stroke="#d4a96a"
                   strokeWidth={isSelected ? 1 : 0.5}
