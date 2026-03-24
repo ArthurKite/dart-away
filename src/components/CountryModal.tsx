@@ -47,16 +47,19 @@ export default function CountryModal({ country, onClose, onThrowAgain }: Country
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [weatherLoading, setWeatherLoading] = useState(true)
   const [weatherError, setWeatherError] = useState(false)
+  const [aiContent, setAiContent] = useState<{ funFact: string; slackMessage: string } | null>(null)
+  const [aiLoading, setAiLoading] = useState(true)
   const countryCode = getCountryCode(country)
 
-  const slackMessage = `Hey boss, I just threw a dart at a map and it landed on ${country}! I think the universe is telling me I need a vacation there. Can I book some time off? 🎯✈️`
+  const fallbackSlack = `Hey boss, I just threw a dart at a map and it landed on ${country}! I think the universe is telling me I need a vacation there. Can I book some time off? 🎯✈️`
+  const displaySlack = aiContent?.slackMessage || fallbackSlack
 
   // Trigger entrance animation on mount
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true))
   }, [])
 
-  // Fetch weather on mount
+  // Fetch weather on mount, then fetch AI content once weather resolves
   useEffect(() => {
     let cancelled = false
     fetchWeather(country)
@@ -64,12 +67,45 @@ export default function CountryModal({ country, onClose, onThrowAgain }: Country
         if (!cancelled) {
           setWeather(data)
           setWeatherLoading(false)
+          // Now fetch AI content with weather info
+          const tempStr = `${data.temperature}°C, ${data.description}`
+          fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ country, temperature: tempStr }),
+          })
+            .then((res) => res.ok ? res.json() : Promise.reject(new Error('API error')))
+            .then((ai) => {
+              if (!cancelled) {
+                setAiContent(ai)
+                setAiLoading(false)
+              }
+            })
+            .catch(() => {
+              if (!cancelled) setAiLoading(false)
+            })
         }
       })
       .catch(() => {
         if (!cancelled) {
           setWeatherError(true)
           setWeatherLoading(false)
+          // Still try AI without weather info
+          fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ country, temperature: 'unknown' }),
+          })
+            .then((res) => res.ok ? res.json() : Promise.reject(new Error('API error')))
+            .then((ai) => {
+              if (!cancelled) {
+                setAiContent(ai)
+                setAiLoading(false)
+              }
+            })
+            .catch(() => {
+              if (!cancelled) setAiLoading(false)
+            })
         }
       })
     return () => { cancelled = true }
@@ -86,13 +122,12 @@ export default function CountryModal({ country, onClose, onThrowAgain }: Country
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(slackMessage)
+      await navigator.clipboard.writeText(displaySlack)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      // Fallback for older browsers
       const ta = document.createElement('textarea')
-      ta.value = slackMessage
+      ta.value = displaySlack
       document.body.appendChild(ta)
       ta.select()
       document.execCommand('copy')
@@ -100,7 +135,7 @@ export default function CountryModal({ country, onClose, onThrowAgain }: Country
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
-  }, [slackMessage])
+  }, [displaySlack])
 
   return (
     <div
@@ -229,25 +264,54 @@ export default function CountryModal({ country, onClose, onThrowAgain }: Country
         </p>
 
         {/* Fun fact */}
-        <p style={{ fontSize: 17, textAlign: 'center', margin: '12px 0', fontStyle: 'italic' }}>
-          📜 Did you know? This country has a fascinating history waiting to be explored!
-        </p>
+        <div style={{ margin: '12px 0' }}>
+          {aiLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: '80%', height: 14, borderRadius: 4, background: '#d4a96a', opacity: 0.25, animation: 'skeleton-pulse 1.2s ease-in-out infinite' }} />
+              <div style={{ width: '60%', height: 14, borderRadius: 4, background: '#d4a96a', opacity: 0.25, animation: 'skeleton-pulse 1.2s ease-in-out infinite 0.15s' }} />
+            </div>
+          ) : (
+            <p style={{ fontSize: 17, textAlign: 'center', margin: 0, fontStyle: 'italic' }}>
+              📜 {aiContent?.funFact || 'Did you know? This country has a fascinating history waiting to be explored!'}
+            </p>
+          )}
+        </div>
 
         {/* Slack message */}
-        <blockquote
-          style={{
-            margin: '20px 0 16px',
-            padding: '14px 16px',
-            background: 'rgba(139, 105, 20, 0.08)',
-            borderLeft: '4px solid #b8860b',
-            borderRadius: '0 6px 6px 0',
-            fontSize: 15,
-            lineHeight: 1.55,
-            fontStyle: 'italic',
-          }}
-        >
-          {slackMessage}
-        </blockquote>
+        <div style={{ margin: '20px 0 16px' }}>
+          {aiLoading ? (
+            <div
+              style={{
+                padding: '14px 16px',
+                background: 'rgba(139, 105, 20, 0.08)',
+                borderLeft: '4px solid #b8860b',
+                borderRadius: '0 6px 6px 0',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+              }}
+            >
+              <div style={{ width: '90%', height: 13, borderRadius: 4, background: '#d4a96a', opacity: 0.25, animation: 'skeleton-pulse 1.2s ease-in-out infinite' }} />
+              <div style={{ width: '95%', height: 13, borderRadius: 4, background: '#d4a96a', opacity: 0.25, animation: 'skeleton-pulse 1.2s ease-in-out infinite 0.1s' }} />
+              <div style={{ width: '70%', height: 13, borderRadius: 4, background: '#d4a96a', opacity: 0.25, animation: 'skeleton-pulse 1.2s ease-in-out infinite 0.2s' }} />
+            </div>
+          ) : (
+            <blockquote
+              style={{
+                margin: 0,
+                padding: '14px 16px',
+                background: 'rgba(139, 105, 20, 0.08)',
+                borderLeft: '4px solid #b8860b',
+                borderRadius: '0 6px 6px 0',
+                fontSize: 15,
+                lineHeight: 1.55,
+                fontStyle: 'italic',
+              }}
+            >
+              {displaySlack}
+            </blockquote>
+          )}
+        </div>
 
         {/* Buttons row */}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 20 }}>
