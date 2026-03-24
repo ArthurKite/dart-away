@@ -29,6 +29,10 @@ export default function App() {
   const [parallax, setParallax] = useState({ x: 0, y: 0 })
   const modalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Map zoom/pan state (controlled)
+  const [mapCenter, setMapCenter] = useState<[number, number]>([0, 0])
+  const [mapZoom, setMapZoom] = useState(1)
+
   // History state
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -39,6 +43,14 @@ export default function App() {
   const handleGeographiesLoaded = useCallback((geos: GeoFeature[]) => {
     setGeographies(geos)
   }, [])
+
+  const handleMapMoveEnd = useCallback(
+    (position: { coordinates: [number, number]; zoom: number }) => {
+      setMapCenter(position.coordinates)
+      setMapZoom(position.zoom)
+    },
+    [],
+  )
 
   // Parallax mouse tracking
   useEffect(() => {
@@ -53,40 +65,47 @@ export default function App() {
 
   const handleThrow = () => {
     if (geographies.length === 0 || isThrowing) return
+
+    // Reset map to default view first so projection calculation is correct
+    setMapCenter([0, 0])
+    setMapZoom(1)
     setIsThrowing(true)
     setDartLanded(false)
     playWhoosh()
 
-    // Pick a random country, retrying if centroid projection fails
-    let geo: GeoFeature | null = null
-    let coords: [number, number] | null = null
-    let attempts = 0
-    while (!coords && attempts < 20) {
-      geo = geographies[Math.floor(Math.random() * geographies.length)]
-      coords = getCountryCentroidViewport(geo)
-      attempts++
-    }
+    // Small delay to let the map animate back before computing centroid
+    setTimeout(() => {
+      // Pick a random country, retrying if centroid projection fails
+      let geo: GeoFeature | null = null
+      let coords: [number, number] | null = null
+      let attempts = 0
+      while (!coords && attempts < 20) {
+        geo = geographies[Math.floor(Math.random() * geographies.length)]
+        coords = getCountryCentroidViewport(geo)
+        attempts++
+      }
 
-    if (!geo || !coords) {
-      console.warn('Could not find a projectable country')
-      setIsThrowing(false)
-      return
-    }
+      if (!geo || !coords) {
+        console.warn('Could not find a projectable country')
+        setIsThrowing(false)
+        return
+      }
 
-    const country = geo.properties.name
-    console.log('🎯 Dart thrown toward:', country)
-    setSelectedCountry(country)
-    setThrowState({ country, targetX: coords[0], targetY: coords[1], geo })
+      const country = geo.properties.name
+      console.log('🎯 Dart thrown toward:', country)
+      setSelectedCountry(country)
+      setThrowState({ country, targetX: coords[0], targetY: coords[1], geo })
 
-    // Prepare a pending history entry
-    const isRepeat = history.some((e) => e.country === country)
-    pendingEntryRef.current = {
-      id: nextIdRef.current++,
-      country,
-      countryCode: getCountryCode(country),
-      isRepeat,
-      timestamp: Date.now(),
-    }
+      // Prepare a pending history entry
+      const isRepeat = history.some((e) => e.country === country)
+      pendingEntryRef.current = {
+        id: nextIdRef.current++,
+        country,
+        countryCode: getCountryCode(country),
+        isRepeat,
+        timestamp: Date.now(),
+      }
+    }, 350) // wait for map to reset to default position
   }
 
   const handleDartLanded = useCallback(() => {
@@ -166,6 +185,9 @@ export default function App() {
           onGeographiesLoaded={handleGeographiesLoaded}
           selectedCountry={selectedCountry}
           dartLanded={dartLanded}
+          center={mapCenter}
+          zoom={mapZoom}
+          onMoveEnd={handleMapMoveEnd}
         />
       </div>
 
