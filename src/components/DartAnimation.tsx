@@ -70,8 +70,8 @@ export default function DartAnimation({ targetX, targetY, onLanded }: DartAnimat
 
       const [x, y] = bezier(t, p0, p1, p2)
       const [dx, dy] = bezierTangent(t, p0, p1, p2)
-      // Rotation: 90° offset because the dart SVG points down by default
-      const angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90
+      // Rotation: -90° offset because the dart SVG tip points down (positive Y)
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI) - 90
 
       if (dartRef.current) {
         dartRef.current.style.left = `${x}px`
