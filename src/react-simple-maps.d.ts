@@ -40,4 +40,13 @@ declare module 'react-simple-maps' {
     ref?: Ref<SVGGElement>
   }
   export const ZoomableGroup: ComponentType<ZoomableGroupProps>
+
+  interface GraticuleProps {
+    stroke?: string
+    strokeWidth?: number
+    fill?: string
+    step?: [number, number]
+    clipPath?: string
+  }
+  export const Graticule: ComponentType<GraticuleProps>
 }

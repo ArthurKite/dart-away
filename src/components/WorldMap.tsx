@@ -1,5 +1,6 @@
 import { useRef, useCallback } from 'react'
-import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps'
+import { ComposableMap, Geographies, Geography, ZoomableGroup, Graticule } from 'react-simple-maps'
+import OceanDecorations from './OceanDecorations'
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'
 
@@ -26,7 +27,7 @@ interface WorldMapProps {
   onMoveEnd?: (position: { coordinates: [number, number]; zoom: number }) => void
 }
 
-const DEFAULT_FILL = '#e8d5a3'
+const DEFAULT_FILL = '#c9a870'
 const GOLD_FILL = '#c9a84c'
 const DIMMED_OPACITY = 0.5
 
@@ -49,7 +50,7 @@ export default function WorldMap({
   )
 
   return (
-    <div className="w-full h-full" style={{ background: '#c9dce8' }}>
+    <div className="w-full h-full" style={{ background: '#5c8fa8' }}>
       <ComposableMap
         projection="geoNaturalEarth1"
         projectionConfig={{ scale: MAP_SCALE, center: [0, 0] }}
@@ -68,6 +69,7 @@ export default function WorldMap({
             [MAP_WIDTH + 100, MAP_HEIGHT + 50],
           ]}
         >
+          <Graticule stroke="#4a8090" strokeWidth={0.3} fill="none" step={[30, 30]} />
           <Geographies geography={GEO_URL}>
             {({ geographies: rawGeos }) => {
               const geographies = rawGeos as unknown as GeoFeature[]
@@ -91,7 +93,7 @@ export default function WorldMap({
                     key={geo.rsmKey}
                     geography={geo as unknown as Record<string, unknown>}
                     fill={isSelected ? GOLD_FILL : DEFAULT_FILL}
-                    stroke="#d4a96a"
+                    stroke="#8B6335"
                     strokeWidth={isSelected ? 1 : 0.5}
                     style={{
                       default: {
@@ -118,6 +120,7 @@ export default function WorldMap({
               })
             }}
           </Geographies>
+          <OceanDecorations />
         </ZoomableGroup>
       </ComposableMap>
     </div>

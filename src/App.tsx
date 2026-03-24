@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import WorldMap, { type GeoFeature } from './components/WorldMap'
+import MapBorder from './components/MapBorder'
 import CompassRose from './components/CompassRose'
 import ThrowButton from './components/ThrowButton'
 import DartAnimation from './components/DartAnimation'
@@ -282,6 +283,9 @@ export default function App() {
           }}
         />
       )}
+
+      {/* Ornate map border overlay — rendered last, on top of everything */}
+      <MapBorder />
 
     </div>
   )
