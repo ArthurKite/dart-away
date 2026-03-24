@@ -87,3 +87,17 @@
     );
   }
 }
+
+/* ============================================================
+   ANIMATIONS: Dart throw effects
+   ============================================================ */
+@keyframes ripple-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.5);
+    opacity: 0;
+  }
+}
