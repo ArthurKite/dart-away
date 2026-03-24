@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { getCountryCode } from '../utils/countryCodes'
 import { fetchWeather, type WeatherData } from '../utils/weather'
 import { getFunFact } from '../utils/funFacts'
+import { getSlackMessage } from '../utils/slackMessages'
 
 export interface ModalData {
   weather: WeatherData | null
@@ -59,81 +60,67 @@ export default function CountryModal({ country, onClose, onThrowAgain, preloaded
   const [weather, setWeather] = useState<WeatherData | null>(preloaded?.weather ?? null)
   const [weatherLoading, setWeatherLoading] = useState(!hasPreloaded)
   const [weatherError, setWeatherError] = useState(false)
-  const [aiContent, setAiContent] = useState<{ funFact: string; slackMessage: string } | null>(
-    preloaded?.funFact || preloaded?.slackMessage
-      ? { funFact: preloaded.funFact ?? '', slackMessage: preloaded.slackMessage ?? '' }
-      : null
-  )
-  const [aiLoading, setAiLoading] = useState(!hasPreloaded)
+  // aiContent/aiLoading removed — fun facts are static, slack messages are template-based
   const countryCode = getCountryCode(country)
+  const funFact = getFunFact(country)
 
-  const fallbackSlack = `Hey boss, I just threw a dart at a map and it landed on ${country}! I think the universe is telling me I need a vacation there. Can I book some time off? 🎯✈️`
-  const displaySlack = aiContent?.slackMessage || fallbackSlack
+  // Generate a random Slack message from templates.
+  // For preloaded (history replay) use the stored message; for fresh throws compute once weather loads.
+  const [slackMessage, setSlackMessage] = useState<string>(
+    preloaded?.slackMessage ??
+    getSlackMessage(country, funFact)
+  )
+  const slackMessageSet = useRef(!!preloaded?.slackMessage)
+
+  const displaySlack = slackMessage
 
   // Trigger entrance animation on mount
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true))
   }, [])
 
-  // Fetch weather on mount, then fetch AI content once weather resolves
-  // Skip entirely if preloaded data was provided (history replay)
+  // Fetch weather on mount, then update Slack message with real weather data.
+  // Skip entirely if preloaded data was provided (history replay).
   useEffect(() => {
     if (hasPreloaded) return
     let cancelled = false
-    let finalWeather: WeatherData | null = null
-    let finalAi: { funFact: string; slackMessage: string } | null = null
-
-    const staticFunFact = getFunFact(country)
-
-    const reportData = () => {
-      onDataLoaded?.({
-        weather: finalWeather,
-        funFact: staticFunFact,
-        slackMessage: finalAi?.slackMessage ?? null,
-      })
-    }
-
-    const fetchAi = (tempStr: string) => {
-      fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ country, temperature: tempStr }),
-      })
-        .then((res) => res.ok ? res.json() : Promise.reject(new Error('API error')))
-        .then((ai) => {
-          if (!cancelled) {
-            finalAi = ai
-            setAiContent(ai)
-            setAiLoading(false)
-            reportData()
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setAiLoading(false)
-            reportData()
-          }
-        })
-    }
 
     fetchWeather(country)
       .then((data) => {
         if (!cancelled) {
-          finalWeather = data
           setWeather(data)
           setWeatherLoading(false)
-          fetchAi(`${data.temperature}°C, ${data.description}`)
+          // Regenerate slack message with real weather info (only once)
+          if (!slackMessageSet.current) {
+            slackMessageSet.current = true
+            const msg = getSlackMessage(
+              country,
+              funFact,
+              `${data.temperature}°C ${data.description}`,
+              data.capital,
+            )
+            setSlackMessage(msg)
+          }
+          onDataLoaded?.({
+            weather: data,
+            funFact,
+            slackMessage: slackMessage,
+          })
         }
       })
       .catch(() => {
         if (!cancelled) {
           setWeatherError(true)
           setWeatherLoading(false)
-          fetchAi('unknown')
+          onDataLoaded?.({
+            weather: null,
+            funFact,
+            slackMessage: slackMessage,
+          })
         }
       })
     return () => { cancelled = true }
-  }, [country, hasPreloaded, onDataLoaded])
+  }, [country, hasPreloaded, onDataLoaded, funFact, slackMessage])
 
   // Escape key handler
   useEffect(() => {
@@ -289,40 +276,22 @@ export default function CountryModal({ country, onClose, onThrowAgain, preloaded
           </p>
         </div>
 
-        {/* Slack message */}
+        {/* Slack message — always instant from templates */}
         <div style={{ margin: '20px 0 16px' }}>
-          {aiLoading ? (
-            <div
-              style={{
-                padding: '14px 16px',
-                background: 'rgba(139, 105, 20, 0.08)',
-                borderLeft: '4px solid #b8860b',
-                borderRadius: '0 6px 6px 0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-              }}
-            >
-              <div style={{ width: '90%', height: 13, borderRadius: 4, background: '#d4a96a', opacity: 0.25, animation: 'skeleton-pulse 1.2s ease-in-out infinite' }} />
-              <div style={{ width: '95%', height: 13, borderRadius: 4, background: '#d4a96a', opacity: 0.25, animation: 'skeleton-pulse 1.2s ease-in-out infinite 0.1s' }} />
-              <div style={{ width: '70%', height: 13, borderRadius: 4, background: '#d4a96a', opacity: 0.25, animation: 'skeleton-pulse 1.2s ease-in-out infinite 0.2s' }} />
-            </div>
-          ) : (
-            <blockquote
-              style={{
-                margin: 0,
-                padding: '14px 16px',
-                background: 'rgba(139, 105, 20, 0.08)',
-                borderLeft: '4px solid #b8860b',
-                borderRadius: '0 6px 6px 0',
-                fontSize: 15,
-                lineHeight: 1.55,
-                fontStyle: 'italic',
-              }}
-            >
-              {displaySlack}
-            </blockquote>
-          )}
+          <blockquote
+            style={{
+              margin: 0,
+              padding: '14px 16px',
+              background: 'rgba(139, 105, 20, 0.08)',
+              borderLeft: '4px solid #b8860b',
+              borderRadius: '0 6px 6px 0',
+              fontSize: 15,
+              lineHeight: 1.55,
+              fontStyle: 'italic',
+            }}
+          >
+            {displaySlack}
+          </blockquote>
         </div>
 
         {/* Buttons row */}
