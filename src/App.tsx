@@ -3,11 +3,14 @@ import WorldMap, { type GeoFeature } from './components/WorldMap'
 import CompassRose from './components/CompassRose'
 import ThrowButton from './components/ThrowButton'
 import DartAnimation from './components/DartAnimation'
-import CountryModal from './components/CountryModal'
+import CountryModal, { type ModalData } from './components/CountryModal'
 import MuteButton from './components/MuteButton'
 import DustParticles from './components/DustParticles'
+import HistorySidebar from './components/HistorySidebar'
 import { getCountryCentroidViewport } from './utils/projection'
+import { getCountryCode } from './utils/countryCodes'
 import { playWhoosh, playLand } from './utils/sounds'
+import type { HistoryEntry } from './types'
 
 interface ThrowState {
   country: string
@@ -25,6 +28,13 @@ export default function App() {
   const [showModal, setShowModal] = useState(false)
   const [parallax, setParallax] = useState({ x: 0, y: 0 })
   const modalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // History state
+  const [history, setHistory] = useState<HistoryEntry[]>([])
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [historyModal, setHistoryModal] = useState<HistoryEntry | null>(null)
+  const nextIdRef = useRef(1)
+  const pendingEntryRef = useRef<Partial<HistoryEntry> | null>(null)
 
   const handleGeographiesLoaded = useCallback((geos: GeoFeature[]) => {
     setGeographies(geos)
@@ -67,6 +77,16 @@ export default function App() {
     console.log('🎯 Dart thrown toward:', country)
     setSelectedCountry(country)
     setThrowState({ country, targetX: coords[0], targetY: coords[1], geo })
+
+    // Prepare a pending history entry
+    const isRepeat = history.some((e) => e.country === country)
+    pendingEntryRef.current = {
+      id: nextIdRef.current++,
+      country,
+      countryCode: getCountryCode(country),
+      isRepeat,
+      timestamp: Date.now(),
+    }
   }
 
   const handleDartLanded = useCallback(() => {
@@ -77,6 +97,23 @@ export default function App() {
     modalTimerRef.current = setTimeout(() => setShowModal(true), 2000)
   }, [])
 
+  // Called by CountryModal when it finishes fetching data
+  const handleModalDataLoaded = useCallback((data: ModalData) => {
+    if (!pendingEntryRef.current) return
+    const entry: HistoryEntry = {
+      id: pendingEntryRef.current.id!,
+      country: pendingEntryRef.current.country!,
+      countryCode: pendingEntryRef.current.countryCode ?? null,
+      weather: data.weather,
+      funFact: data.funFact,
+      slackMessage: data.slackMessage,
+      isRepeat: pendingEntryRef.current.isRepeat!,
+      timestamp: pendingEntryRef.current.timestamp!,
+    }
+    setHistory((prev) => [entry, ...prev])
+    pendingEntryRef.current = null
+  }, [])
+
   const handleReset = useCallback(() => {
     // Clear any pending modal timer
     if (modalTimerRef.current) {
@@ -84,6 +121,7 @@ export default function App() {
       modalTimerRef.current = null
     }
     setShowModal(false)
+    setHistoryModal(null)
     // Start the reset: zoom out + fade highlight (CSS transitions take ~0.8s)
     setDartLanded(false)
 
@@ -93,6 +131,15 @@ export default function App() {
       setSelectedCountry(null)
       setIsThrowing(false)
     }, 800)
+  }, [])
+
+  const handleHistoryEntryClick = useCallback((entry: HistoryEntry) => {
+    setSidebarOpen(false)
+    setHistoryModal(entry)
+  }, [])
+
+  const handleHistoryModalClose = useCallback(() => {
+    setHistoryModal(null)
   }, [])
 
   // Compute zoom transform style for the map wrapper
@@ -124,6 +171,14 @@ export default function App() {
 
       {/* Dust particles overlay */}
       <DustParticles />
+
+      {/* History sidebar */}
+      <HistorySidebar
+        open={sidebarOpen}
+        onToggle={() => setSidebarOpen((o) => !o)}
+        entries={history}
+        onEntryClick={handleHistoryEntryClick}
+      />
 
       {/* Title — centred at the top, above textures */}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center pb-4 pt-6">
@@ -181,12 +236,28 @@ export default function App() {
         />
       )}
 
-      {/* Country info modal */}
+      {/* Country info modal — fresh throw */}
       {showModal && selectedCountry && (
         <CountryModal
           country={selectedCountry}
           onClose={handleReset}
           onThrowAgain={handleReset}
+          onDataLoaded={handleModalDataLoaded}
+        />
+      )}
+
+      {/* Country info modal — history replay (preloaded data, no fetching) */}
+      {historyModal && (
+        <CountryModal
+          key={`history-${historyModal.id}`}
+          country={historyModal.country}
+          onClose={handleHistoryModalClose}
+          onThrowAgain={handleHistoryModalClose}
+          preloaded={{
+            weather: historyModal.weather,
+            funFact: historyModal.funFact,
+            slackMessage: historyModal.slackMessage,
+          }}
         />
       )}
 

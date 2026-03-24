@@ -2,10 +2,20 @@ import { useEffect, useState, useCallback } from 'react'
 import { getCountryCode } from '../utils/countryCodes'
 import { fetchWeather, type WeatherData } from '../utils/weather'
 
+export interface ModalData {
+  weather: WeatherData | null
+  funFact: string | null
+  slackMessage: string | null
+}
+
 interface CountryModalProps {
   country: string
   onClose: () => void
   onThrowAgain: () => void
+  /** Pre-loaded data from history — skips fetching when provided */
+  preloaded?: ModalData | null
+  /** Called when fresh data finishes loading (for history storage) */
+  onDataLoaded?: (data: ModalData) => void
 }
 
 function CornerOrnament({ style }: { style: React.CSSProperties }) {
@@ -41,14 +51,19 @@ function CornerOrnament({ style }: { style: React.CSSProperties }) {
   )
 }
 
-export default function CountryModal({ country, onClose, onThrowAgain }: CountryModalProps) {
+export default function CountryModal({ country, onClose, onThrowAgain, preloaded, onDataLoaded }: CountryModalProps) {
+  const hasPreloaded = !!preloaded
   const [copied, setCopied] = useState(false)
   const [visible, setVisible] = useState(false)
-  const [weather, setWeather] = useState<WeatherData | null>(null)
-  const [weatherLoading, setWeatherLoading] = useState(true)
+  const [weather, setWeather] = useState<WeatherData | null>(preloaded?.weather ?? null)
+  const [weatherLoading, setWeatherLoading] = useState(!hasPreloaded)
   const [weatherError, setWeatherError] = useState(false)
-  const [aiContent, setAiContent] = useState<{ funFact: string; slackMessage: string } | null>(null)
-  const [aiLoading, setAiLoading] = useState(true)
+  const [aiContent, setAiContent] = useState<{ funFact: string; slackMessage: string } | null>(
+    preloaded?.funFact || preloaded?.slackMessage
+      ? { funFact: preloaded.funFact ?? '', slackMessage: preloaded.slackMessage ?? '' }
+      : null
+  )
+  const [aiLoading, setAiLoading] = useState(!hasPreloaded)
   const countryCode = getCountryCode(country)
 
   const fallbackSlack = `Hey boss, I just threw a dart at a map and it landed on ${country}! I think the universe is telling me I need a vacation there. Can I book some time off? 🎯✈️`
@@ -60,56 +75,62 @@ export default function CountryModal({ country, onClose, onThrowAgain }: Country
   }, [])
 
   // Fetch weather on mount, then fetch AI content once weather resolves
+  // Skip entirely if preloaded data was provided (history replay)
   useEffect(() => {
+    if (hasPreloaded) return
     let cancelled = false
+    let finalWeather: WeatherData | null = null
+    let finalAi: { funFact: string; slackMessage: string } | null = null
+
+    const reportData = () => {
+      onDataLoaded?.({
+        weather: finalWeather,
+        funFact: finalAi?.funFact ?? null,
+        slackMessage: finalAi?.slackMessage ?? null,
+      })
+    }
+
+    const fetchAi = (tempStr: string) => {
+      fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country, temperature: tempStr }),
+      })
+        .then((res) => res.ok ? res.json() : Promise.reject(new Error('API error')))
+        .then((ai) => {
+          if (!cancelled) {
+            finalAi = ai
+            setAiContent(ai)
+            setAiLoading(false)
+            reportData()
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setAiLoading(false)
+            reportData()
+          }
+        })
+    }
+
     fetchWeather(country)
       .then((data) => {
         if (!cancelled) {
+          finalWeather = data
           setWeather(data)
           setWeatherLoading(false)
-          // Now fetch AI content with weather info
-          const tempStr = `${data.temperature}°C, ${data.description}`
-          fetch('/api/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ country, temperature: tempStr }),
-          })
-            .then((res) => res.ok ? res.json() : Promise.reject(new Error('API error')))
-            .then((ai) => {
-              if (!cancelled) {
-                setAiContent(ai)
-                setAiLoading(false)
-              }
-            })
-            .catch(() => {
-              if (!cancelled) setAiLoading(false)
-            })
+          fetchAi(`${data.temperature}°C, ${data.description}`)
         }
       })
       .catch(() => {
         if (!cancelled) {
           setWeatherError(true)
           setWeatherLoading(false)
-          // Still try AI without weather info
-          fetch('/api/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ country, temperature: 'unknown' }),
-          })
-            .then((res) => res.ok ? res.json() : Promise.reject(new Error('API error')))
-            .then((ai) => {
-              if (!cancelled) {
-                setAiContent(ai)
-                setAiLoading(false)
-              }
-            })
-            .catch(() => {
-              if (!cancelled) setAiLoading(false)
-            })
+          fetchAi('unknown')
         }
       })
     return () => { cancelled = true }
-  }, [country])
+  }, [country, hasPreloaded, onDataLoaded])
 
   // Escape key handler
   useEffect(() => {
