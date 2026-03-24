@@ -167,6 +167,7 @@
   max-width: 100vw;
   max-height: 100vh;
   overflow-y: auto;
+  overflow-x: hidden;
   border-radius: 0;
   /* No padding — scroll edges + inner body handle spacing */
 }

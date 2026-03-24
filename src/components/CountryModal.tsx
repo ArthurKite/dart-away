@@ -61,8 +61,8 @@ function WaxSeal({ onClick }: { onClick: () => void }) {
       aria-label="Close"
       style={{
         position: 'absolute',
-        top: -14,
-        right: -14,
+        top: 8,
+        right: 8,
         width: 38,
         height: 38,
         borderRadius: '50%',
