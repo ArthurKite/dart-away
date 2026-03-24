@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { getCountryCode } from '../utils/countryCodes'
+import { fetchWeather, type WeatherData } from '../utils/weather'
 
 interface CountryModalProps {
   country: string
@@ -43,6 +44,9 @@ function CornerOrnament({ style }: { style: React.CSSProperties }) {
 export default function CountryModal({ country, onClose, onThrowAgain }: CountryModalProps) {
   const [copied, setCopied] = useState(false)
   const [visible, setVisible] = useState(false)
+  const [weather, setWeather] = useState<WeatherData | null>(null)
+  const [weatherLoading, setWeatherLoading] = useState(true)
+  const [weatherError, setWeatherError] = useState(false)
   const countryCode = getCountryCode(country)
 
   const slackMessage = `Hey boss, I just threw a dart at a map and it landed on ${country}! I think the universe is telling me I need a vacation there. Can I book some time off? 🎯✈️`
@@ -51,6 +55,25 @@ export default function CountryModal({ country, onClose, onThrowAgain }: Country
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true))
   }, [])
+
+  // Fetch weather on mount
+  useEffect(() => {
+    let cancelled = false
+    fetchWeather(country)
+      .then((data) => {
+        if (!cancelled) {
+          setWeather(data)
+          setWeatherLoading(false)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setWeatherError(true)
+          setWeatherLoading(false)
+        }
+      })
+    return () => { cancelled = true }
+  }, [country])
 
   // Escape key handler
   useEffect(() => {
@@ -183,7 +206,26 @@ export default function CountryModal({ country, onClose, onThrowAgain }: Country
 
         {/* Temperature */}
         <p style={{ fontSize: 18, textAlign: 'center', margin: '12px 0' }}>
-          🌡️ 24°C — Warm and sunny
+          {weatherLoading ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 16,
+                  height: 16,
+                  border: '2px solid #d4a96a',
+                  borderTopColor: 'transparent',
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite',
+                }}
+              />
+              Fetching weather...
+            </span>
+          ) : weatherError ? (
+            '🌡️ Weather data unavailable'
+          ) : weather ? (
+            `${weather.emoji} ${weather.temperature}°C in ${weather.capital} — ${weather.description}`
+          ) : null}
         </p>
 
         {/* Fun fact */}
