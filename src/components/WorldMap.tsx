@@ -41,8 +41,9 @@ export default function WorldMap({
   const reportedRef = useRef(false)
 
   const handleMoveEnd = useCallback(
-    (position: { coordinates: [number, number]; zoom: number }) => {
-      onMoveEnd?.(position)
+    (position: unknown) => {
+      const pos = position as { coordinates: [number, number]; zoom: number }
+      onMoveEnd?.(pos)
     },
     [onMoveEnd],
   )
