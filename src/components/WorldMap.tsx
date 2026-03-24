@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { ComposableMap, Geographies, Geography } from 'react-simple-maps'
+import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps'
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'
 
@@ -40,6 +40,7 @@ export default function WorldMap({
         height={MAP_HEIGHT}
         style={{ width: '100%', height: '100%' }}
       >
+        <ZoomableGroup minZoom={1} maxZoom={5}>
         <Geographies geography={GEO_URL}>
           {({ geographies }) => {
             if (!reportedRef.current && onGeographiesLoaded && geographies.length > 0) {
@@ -81,6 +82,7 @@ export default function WorldMap({
             })
           }}
         </Geographies>
+        </ZoomableGroup>
       </ComposableMap>
     </div>
   )

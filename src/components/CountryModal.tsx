@@ -153,20 +153,15 @@ export default function CountryModal({ country, onClose, onThrowAgain }: Country
         onClick={onClose}
       />
 
-      {/* Modal card */}
+      {/* Modal card — full-screen on mobile, centered card on desktop */}
       <div
+        className="modal-card"
         style={{
           position: 'relative',
           zIndex: 1,
-          maxWidth: 460,
-          width: '90vw',
-          maxHeight: '85vh',
           overflowY: 'auto',
           background: 'linear-gradient(135deg, #f4e4c1 0%, #ecdcb0 50%, #f0debb 100%)',
           border: '3px solid #8b6914',
-          borderRadius: 8,
-          boxShadow: '0 8px 40px rgba(20, 10, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.3)',
-          padding: '36px 32px 28px',
           fontFamily: '"Crimson Text", Georgia, serif',
           color: '#3d2b1f',
           transform: visible ? 'scale(1)' : 'scale(0.8)',

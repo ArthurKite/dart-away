@@ -1,10 +1,13 @@
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import WorldMap, { type GeoFeature } from './components/WorldMap'
 import CompassRose from './components/CompassRose'
 import ThrowButton from './components/ThrowButton'
 import DartAnimation from './components/DartAnimation'
 import CountryModal from './components/CountryModal'
+import MuteButton from './components/MuteButton'
+import DustParticles from './components/DustParticles'
 import { getCountryCentroidViewport } from './utils/projection'
+import { playWhoosh, playLand } from './utils/sounds'
 
 interface ThrowState {
   country: string
@@ -20,16 +23,29 @@ export default function App() {
   const [throwState, setThrowState] = useState<ThrowState | null>(null)
   const [dartLanded, setDartLanded] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [parallax, setParallax] = useState({ x: 0, y: 0 })
   const modalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleGeographiesLoaded = useCallback((geos: GeoFeature[]) => {
     setGeographies(geos)
   }, [])
 
+  // Parallax mouse tracking
+  useEffect(() => {
+    const handleMouse = (e: MouseEvent) => {
+      const x = (e.clientX / window.innerWidth - 0.5) * 8
+      const y = (e.clientY / window.innerHeight - 0.5) * 8
+      setParallax({ x, y })
+    }
+    window.addEventListener('mousemove', handleMouse)
+    return () => window.removeEventListener('mousemove', handleMouse)
+  }, [])
+
   const handleThrow = () => {
     if (geographies.length === 0 || isThrowing) return
     setIsThrowing(true)
     setDartLanded(false)
+    playWhoosh()
 
     // Pick a random country, retrying if centroid projection fails
     let geo: GeoFeature | null = null
@@ -55,6 +71,7 @@ export default function App() {
 
   const handleDartLanded = useCallback(() => {
     setDartLanded(true)
+    playLand()
     console.log('🎯 Dart landed!')
     // Open modal 2 seconds after landing
     modalTimerRef.current = setTimeout(() => setShowModal(true), 2000)
@@ -83,18 +100,18 @@ export default function App() {
     if (dartLanded && throwState) {
       return {
         transformOrigin: `${throwState.targetX}px ${throwState.targetY}px`,
-        transform: 'scale(1.4)',
+        transform: `scale(1.4) translate(${parallax.x * 0.3}px, ${parallax.y * 0.3}px)`,
         transition: 'transform 0.8s ease-out',
       }
     }
     return {
-      transform: 'scale(1)',
-      transition: 'transform 0.8s ease-out',
+      transform: `scale(1) translate(${parallax.x}px, ${parallax.y}px)`,
+      transition: 'transform 0.3s ease-out',
     }
-  }, [dartLanded, throwState])
+  }, [dartLanded, throwState, parallax])
 
   return (
-    <div className="parchment-texture vignette relative h-full w-full overflow-hidden bg-parchment">
+    <div className="page-reveal parchment-texture vignette relative h-full w-full overflow-hidden bg-parchment">
 
       {/* World map — fills the full viewport as the base layer */}
       <div className="absolute inset-0 z-0" style={mapZoomStyle}>
@@ -104,6 +121,9 @@ export default function App() {
           dartLanded={dartLanded}
         />
       </div>
+
+      {/* Dust particles overlay */}
+      <DustParticles />
 
       {/* Title — centred at the top, above textures */}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center pb-4 pt-6">
@@ -120,15 +140,36 @@ export default function App() {
         </h1>
       </header>
 
-      {/* Compass rose — bottom-right corner, above textures */}
-      <div className="pointer-events-none absolute bottom-6 right-6 z-20">
+      {/* Mute button — top-right corner */}
+      <div className="absolute top-4 right-4 z-20">
+        <MuteButton />
+      </div>
+
+      {/* Compass rose — bottom-right corner, above textures, slowly rotating */}
+      <div
+        className="pointer-events-none absolute bottom-14 right-6 z-20 md:bottom-6"
+        style={{ animation: 'compass-rotate 60s linear infinite' }}
+      >
         <CompassRose size={110} />
       </div>
 
-      {/* Throw button — fixed bottom center, above all layers */}
-      <div className="absolute inset-x-0 bottom-8 z-30 flex justify-center">
+      {/* Throw button — fixed bottom center, above all layers, thumb-reachable */}
+      <div className="absolute inset-x-0 bottom-4 z-30 flex justify-center md:bottom-8">
         <ThrowButton disabled={isThrowing || geographies.length === 0} onClick={handleThrow} />
       </div>
+
+      {/* Footer */}
+      <footer
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 pb-1 text-center"
+        style={{
+          fontFamily: '"Crimson Text", Georgia, serif',
+          fontSize: 11,
+          color: '#6b4c35',
+          opacity: 0.6,
+        }}
+      >
+        Dart Away — Because every vacation starts with a random dart throw ✈️
+      </footer>
 
       {/* Dart animation layer */}
       {throwState && (
